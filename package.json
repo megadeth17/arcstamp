@@ -1,0 +1,27 @@
+{
+  "name": "arcstamp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Public verifiable receipts for USDC payments on Arc mainnet",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "node --test --experimental-strip-types \"test/*.test.mts\"",
+    "typecheck": "tsc --noEmit",
+    "fixtures": "node scripts/capture-fixtures.mjs"
+  },
+  "dependencies": {
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}
