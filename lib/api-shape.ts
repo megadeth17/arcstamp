@@ -1,7 +1,7 @@
 // The public JSON contract. Kept in its own module so a test can freeze the
 // shape other people's agents will depend on.
 
-import { ARC_MAINNET, explorerTx } from './arc.ts'
+import { ARC_MAINNET, explorerTx, publicRpcOrigin } from './arc.ts'
 import { formatUnits, isFullyVerified, type Receipt } from './receipt.ts'
 
 export type ApiReceipt = {
@@ -72,6 +72,6 @@ export function toApiReceipt(receipt: Receipt): ApiReceipt {
     finality: receipt.finality,
     checks: receipt.checks,
     explorer: explorerTx(receipt.hash),
-    source: ARC_MAINNET.rpcUrl,
+    source: publicRpcOrigin(),
   }
 }

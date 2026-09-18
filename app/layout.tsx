@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import './globals.css'
-import { ARC_MAINNET } from '../lib/arc.ts'
+import { ARC_MAINNET, publicRpcOrigin } from '../lib/arc.ts'
 import { MOCK_MODE } from '../lib/fetch-receipt.ts'
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
@@ -47,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
           <footer className="foot">
             <p>
-              Reads {ARC_MAINNET.rpcUrl} directly. No account, no wallet, no API key.
+              Reads {publicRpcOrigin()} directly. No account, no wallet, no API key.
             </p>
             <p>
               <a href="https://github.com/megadeth17/arcstamp">Source</a> · <Link href="/api/verify">API</Link> ·{' '}

@@ -5,6 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { publicRpcOrigin } from '../lib/arc.ts'
 import { toApiReceipt } from '../lib/api-shape.ts'
 import { buildReceipt, type RawBlock, type RawTx, type RawTxReceipt } from '../lib/receipt.ts'
 
@@ -114,6 +115,18 @@ test('verified is never true while any check failed', () => {
   assert.equal(unsettled.settled, false)
   assert.equal(unsettled.verified, false)
   assert.equal(unsettled.status, 'awaiting_finality')
+})
+
+test('the published endpoint never carries a provider API key', () => {
+  // A keyed provider puts the secret in the path or the query string. Only the
+  // origin may ever reach a response body or a rendered page.
+  assert.equal(publicRpcOrigin('https://arc-mainnet.g.alchemy.com/v2/SECRET_KEY'), 'https://arc-mainnet.g.alchemy.com')
+  assert.equal(publicRpcOrigin('https://rpc.example.com/rpc?apikey=SECRET'), 'https://rpc.example.com')
+  assert.equal(publicRpcOrigin('https://rpc.mainnet.arc.io'), 'https://rpc.mainnet.arc.io')
+  assert.equal(publicRpcOrigin('not a url'), 'unknown')
+
+  const body = JSON.stringify(api('nativeTransfer'))
+  assert.ok(!body.includes('SECRET'), 'no credential material may appear in a receipt')
 })
 
 test('every transfer is reported with both a human amount and base units', () => {

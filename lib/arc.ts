@@ -29,6 +29,19 @@ export const USDC_EVENT_EMITTER = '0xfffffffffffffffffffffffffffffffffffffffe'
 // keccak256("Transfer(address,address,uint256)")
 export const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
 
+/**
+ * The endpoint is quoted in receipts and in the API so a reader can reproduce
+ * the lookup. A provider URL can carry an API key in its path or query
+ * (…/v2/KEY), so only the origin is ever published.
+ */
+export function publicRpcOrigin(url: string = ARC_MAINNET.rpcUrl): string {
+  try {
+    return new URL(url).origin
+  } catch {
+    return 'unknown'
+  }
+}
+
 export function explorerTx(hash: string): string {
   return `${ARC_MAINNET.explorerUrl}/tx/${hash}`
 }

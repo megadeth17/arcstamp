@@ -2,7 +2,7 @@
 // JSON-RPC objects and returns a receipt, which is why it can be tested offline
 // against captured mainnet fixtures.
 
-import { ARC_MAINNET, TRANSFER_TOPIC, USDC_EVENT_EMITTER } from './arc.ts'
+import { ARC_MAINNET, publicRpcOrigin, TRANSFER_TOPIC, USDC_EVENT_EMITTER } from './arc.ts'
 
 export type RawLog = {
   address: string
@@ -237,7 +237,7 @@ export function buildReceipt(input: ReceiptInput): Receipt {
           id: 'tx-found',
           label: 'Transaction exists on Arc mainnet',
           passed: false,
-          detail: `No transaction with this hash was returned by ${ARC_MAINNET.rpcUrl}. It may be from another chain, or not yet propagated.`,
+          detail: `No transaction with this hash was returned by ${publicRpcOrigin()}. It may be from another chain, or not yet propagated.`,
         },
       ],
     }
@@ -269,7 +269,7 @@ export function buildReceipt(input: ReceiptInput): Receipt {
       id: 'tx-found',
       label: 'Transaction exists on Arc mainnet',
       passed: true,
-      detail: `Returned by ${ARC_MAINNET.rpcUrl} in block ${blockNumber ?? 'pending'}.`,
+      detail: `Returned by ${publicRpcOrigin()} in block ${blockNumber ?? 'pending'}.`,
     },
     {
       id: 'chain-id',

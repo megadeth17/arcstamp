@@ -1,4 +1,4 @@
-import { ARC_MAINNET } from '../../../lib/arc.ts'
+import { ARC_MAINNET, publicRpcOrigin } from '../../../lib/arc.ts'
 import { fixtureReceipts } from '../../../lib/fetch-receipt.ts'
 
 // Usage document, served as JSON so an agent can discover the endpoint it needs
@@ -11,7 +11,7 @@ export function GET() {
       service: 'arcstamp',
       description:
         'Verifiable receipts for USDC payments on Arc mainnet. Reads the chain directly; no key, no account, CORS open.',
-      chain: { name: ARC_MAINNET.name, chainId: ARC_MAINNET.chainId, rpc: ARC_MAINNET.rpcUrl },
+      chain: { name: ARC_MAINNET.name, chainId: ARC_MAINNET.chainId, rpc: publicRpcOrigin() },
       endpoints: [
         {
           method: 'GET',
