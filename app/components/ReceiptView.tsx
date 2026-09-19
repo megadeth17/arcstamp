@@ -1,5 +1,5 @@
 import { ARC_MAINNET, explorerAddress, explorerTx } from '../../lib/arc.ts'
-import { formatUnits, formatUsd, type Receipt } from '../../lib/receipt.ts'
+import { formatUnits, formatUsd, headlineAmount, type Receipt } from '../../lib/receipt.ts'
 
 function shorten(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
@@ -41,7 +41,7 @@ const KIND_LABEL: Record<Receipt['kind'], string> = {
 
 export default function ReceiptView({ receipt }: { receipt: Receipt }) {
   const status = statusOf(receipt)
-  const headline = receipt.kind === 'contract-call' ? receipt.totalMoved : receipt.value
+  const headline = headlineAmount(receipt)
   const passed = receipt.checks.filter((check) => check.passed).length
 
   if (!receipt.found) {

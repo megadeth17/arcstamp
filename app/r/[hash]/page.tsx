@@ -3,7 +3,7 @@ import Link from 'next/link'
 import ReceiptView from '../../components/ReceiptView.tsx'
 import HashForm from '../../components/HashForm.tsx'
 import { fetchReceipt } from '../../../lib/fetch-receipt.ts'
-import { formatUsd, isTxHash, normalizeHash } from '../../../lib/receipt.ts'
+import { formatUsd, headlineAmount, isTxHash, normalizeHash } from '../../../lib/receipt.ts'
 
 export const revalidate = 10
 
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (!receipt.found) {
       return { title: 'Receipt not found', description: `No transaction ${hash} on Arc mainnet.` }
     }
-    const amount = receipt.kind === 'contract-call' ? receipt.totalMoved : receipt.value
+    const amount = headlineAmount(receipt)
     const headline = amount > 0n ? `$${formatUsd(amount)} USDC on Arc` : 'Arc transaction receipt'
     const settled = receipt.finality?.settled ? 'Settled' : 'Not yet final'
     return {

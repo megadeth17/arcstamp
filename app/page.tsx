@@ -2,7 +2,7 @@ import Link from 'next/link'
 import HashForm from './components/HashForm.tsx'
 import { ARC_MAINNET } from '../lib/arc.ts'
 import { fixtureReceipts } from '../lib/fetch-receipt.ts'
-import { formatUnits, formatUsd } from '../lib/receipt.ts'
+import { formatUnits, formatUsd, headlineAmount } from '../lib/receipt.ts'
 import { rpcBatch } from '../lib/rpc.ts'
 
 // The landing page is cheap to serve and its chain status is a few seconds stale
@@ -75,7 +75,7 @@ export default async function Home() {
       </p>
       <ul className="examples">
         {examples.map((receipt) => {
-          const amount = receipt.totalMoved > 0n ? receipt.totalMoved : receipt.value
+          const amount = headlineAmount(receipt)
           return (
             <li key={receipt.hash}>
               <Link className="example" href={`/r/${receipt.hash}`}>

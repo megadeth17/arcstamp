@@ -142,6 +142,19 @@ test('every transfer is reported with both a human amount and base units', () =>
   }
 })
 
+test('a payment sent through the ERC-20 interface is not headed as $0.00', () => {
+  // Regression: these transactions carry no native value, so keying the
+  // headline on tx.value showed a real payment as zero.
+  const body = api('memoSelfTransfer')
+
+  assert.equal(body.amountUsdc, '0.0001')
+  assert.equal(body.amountUsdc, body.totalMovedUsdc)
+  assert.notEqual(body.amountUsdc, '0')
+
+  // And a plain native send still reports its own value.
+  assert.equal(api('nativeTransfer').amountUsdc, '0.4177985')
+})
+
 test('a memo reaches the API with its text, author and index', () => {
   const body = api('memoPayment')
 

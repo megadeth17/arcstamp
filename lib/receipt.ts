@@ -496,6 +496,18 @@ export function buildReceipt(input: ReceiptInput): Receipt {
   }
 }
 
+/**
+ * The amount a receipt leads with.
+ *
+ * It is not the transaction's `value`: a payment sent through the ERC-20
+ * interface carries no native value at all, so a receipt keyed on `value` would
+ * head a real payment with $0.00. What moved is what the Transfer logs say
+ * moved.
+ */
+export function headlineAmount(receipt: Receipt): bigint {
+  return receipt.transfers.length > 0 ? receipt.totalMoved : receipt.value
+}
+
 /** True only when every stated check held. */
 export function isFullyVerified(receipt: Receipt): boolean {
   return receipt.checks.length > 0 && receipt.checks.every((check) => check.passed)

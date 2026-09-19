@@ -2,7 +2,7 @@
 // shape other people's agents will depend on.
 
 import { ARC_MAINNET, explorerTx, publicRpcOrigin } from './arc.ts'
-import { formatUnits, isFullyVerified, type Receipt } from './receipt.ts'
+import { formatUnits, headlineAmount, isFullyVerified, type Receipt } from './receipt.ts'
 
 export type ApiReceipt = {
   hash: string
@@ -42,7 +42,7 @@ function statusOf(receipt: Receipt): ApiReceipt['status'] {
 }
 
 export function toApiReceipt(receipt: Receipt): ApiReceipt {
-  const headline = receipt.kind === 'contract-call' ? receipt.totalMoved : receipt.value
+  const headline = headlineAmount(receipt)
 
   return {
     hash: receipt.hash,
