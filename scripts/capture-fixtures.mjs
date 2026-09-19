@@ -26,6 +26,13 @@ const HASHES = {
   contractCallWithValue: '0x5d57982024b6ad3ca91e398c9a0248179f13dba9821d5e000377c8e4812ec835',
   // zero-value contract call, no system Transfer log
   zeroValueCall: '0x7fb9c7748ff6bd9d68f313571b6fe151d7b2e03b2637e4a7fc940da6501ad6e2',
+  // memo'd ERC-20 payment: emits BOTH the 18-decimal system log and the
+  // 6-decimal ERC-20 log for ONE movement, plus the Memo event
+  memoPayment: '0x3b84ca8db4672dbd24ad40aa2418236dbea61bb98634c633b196feea8328e47e',
+  // memo'd ERC-20 self-transfer: emits NO system log at all, only the 6-decimal
+  // ERC-20 one. A verifier watching only the system emitter reports this real
+  // payment as "no USDC moved".
+  memoSelfTransfer: '0x808d379bf646917db27df3e13e60b8a85ea13022364000caad0ae30567fc3254',
 }
 
 const out = { capturedFrom: RPC, chainId: await rpc('eth_chainId'), transactions: {} }

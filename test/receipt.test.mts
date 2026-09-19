@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   buildReceipt,
+  decodeMemo,
   decodeNote,
   decodeUsdcTransfers,
   formatUnits,
@@ -163,6 +164,99 @@ test('notes are only read as text when the bytes really are text', () => {
   assert.ok(reference)
   assert.equal(reference?.text, null)
   assert.equal(reference?.byteLength, 32)
+})
+
+test('an ERC-20 payment that also emits a system log is counted once, at full precision', () => {
+  // This transaction emits two Transfer logs for one movement: 18 decimals from
+  // the system address and 6 decimals from the ERC-20 interface.
+  const fixture = fixtures.transactions.memoPayment
+  const transfers = decodeUsdcTransfers(fixture.receipt.logs)
+
+  assert.equal(transfers.length, 1, 'one movement, not two')
+  assert.equal(formatUnits(transfers[0].amount), '0.02')
+  assert.equal(transfers[0].precision, 'exact', 'the 18-decimal log wins over the 6-decimal one')
+
+  const receipt = receiptFor('memoPayment')
+  assert.equal(receipt.kind, 'payment', 'a memo goes through a predeploy but it is still a payment')
+  assert.equal(formatUnits(receipt.totalMoved), '0.02')
+})
+
+test('a payment visible only through the 6-decimal view is still found', () => {
+  // Regression: an ERC-20 self-transfer emits NO system log. Reading only the
+  // system emitter reports this real payment as "no USDC moved".
+  const fixture = fixtures.transactions.memoSelfTransfer
+  const systemLogs = fixture.receipt.logs.filter(
+    (log) => log.address.toLowerCase() === '0xfffffffffffffffffffffffffffffffffffffffe',
+  )
+  assert.equal(systemLogs.length, 0, 'fixture must be one with no system log, or it proves nothing')
+
+  const transfers = decodeUsdcTransfers(fixture.receipt.logs)
+  assert.equal(transfers.length, 1)
+  assert.equal(transfers[0].precision, 'truncated')
+  assert.equal(formatUnits(transfers[0].amount), '0.0001')
+
+  const receipt = receiptFor('memoSelfTransfer')
+  assert.notEqual(receipt.kind, 'no-value')
+  assert.ok(receipt.totalMoved > 0n)
+})
+
+test('dust survives reconciliation between the two views', () => {
+  // The 6-decimal view truncates, so matching the two logs has to be floor
+  // division. With equality matching this payment would be counted twice.
+  const from = '0x' + '11'.repeat(20)
+  const to = '0x' + '22'.repeat(20)
+  const topic = (address: string) => '0x' + '0'.repeat(24) + address.slice(2)
+  const TRANSFER = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+  const native = 4086042559998641628n // 4.086042559998641628 USDC
+  const erc20 = native / 10n ** 12n // 4086042 — the explorer's truncated view
+
+  const transfers = decodeUsdcTransfers([
+    {
+      address: '0xfffffffffffffffffffffffffffffffffffffffe',
+      topics: [TRANSFER, topic(from), topic(to)],
+      data: '0x' + native.toString(16).padStart(64, '0'),
+    },
+    {
+      address: '0x3600000000000000000000000000000000000000',
+      topics: [TRANSFER, topic(from), topic(to)],
+      data: '0x' + erc20.toString(16).padStart(64, '0'),
+    },
+  ])
+
+  assert.equal(transfers.length, 1, 'one movement seen through two interfaces')
+  assert.equal(transfers[0].amount, native, 'the dust must not be rounded away')
+  assert.equal(formatUnits(transfers[0].amount), '4.086042559998641628')
+})
+
+test('a memo is decoded with its author and read as text', () => {
+  const memo = decodeMemo(fixtures.transactions.memoPayment.receipt.logs)
+
+  assert.ok(memo, 'the memo event must be found')
+  assert.equal(memo?.text, 'cronus|signal|BTC-USDC momentum|1789733187299')
+  assert.equal(memo?.byteLength, 45)
+  assert.equal(memo?.target, '0x3600000000000000000000000000000000000000')
+  assert.match(memo?.memoId ?? '', /^0x[0-9a-f]{64}$/)
+  assert.match(memo?.index ?? '', /^[0-9]+$/)
+
+  // The Memo predeploy preserves the original caller, so the memo's author is
+  // the payer rather than the predeploy itself.
+  assert.equal(memo?.sender, fixtures.transactions.memoPayment.tx.from.toLowerCase())
+})
+
+test('a receipt with a memo states who wrote it and hides the raw calldata', () => {
+  const receipt = receiptFor('memoSelfTransfer')
+
+  assert.equal(receipt.memo?.text, 'FV-2026-001')
+  assert.equal(receipt.note, null, 'the Memo call wrapper is not shown as a second, unreadable note')
+
+  const attribution = receipt.checks.find((check) => check.id === 'memo-attributed')
+  assert.ok(attribution, 'a memo must come with an attribution check')
+  assert.equal(attribution?.passed, true)
+})
+
+test('transactions with no memo report none', () => {
+  assert.equal(decodeMemo(fixtures.transactions.nativeTransfer.receipt.logs), null)
+  assert.equal(receiptFor('nativeTransfer').memo, null)
 })
 
 test('hash validation rejects near-misses', () => {

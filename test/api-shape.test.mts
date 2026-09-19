@@ -51,6 +51,7 @@ test('the receipt payload carries every documented field', () => {
       'gasUsed',
       'hash',
       'kind',
+      'memo',
       'note',
       'settled',
       'source',
@@ -137,5 +138,19 @@ test('every transfer is reported with both a human amount and base units', () =>
     assert.match(transfer.to, /^0x[0-9a-f]{40}$/)
     assert.equal(typeof transfer.amountUsdc, 'string')
     assert.match(transfer.amountBaseUnits, /^[0-9]+$/)
+    assert.ok(transfer.precision === 'exact' || transfer.precision === 'truncated')
   }
+})
+
+test('a memo reaches the API with its text, author and index', () => {
+  const body = api('memoPayment')
+
+  assert.equal(body.memo?.text, 'cronus|signal|BTC-USDC momentum|1789733187299')
+  assert.equal(body.memo?.sender, body.from)
+  assert.match(body.memo?.index ?? '', /^[0-9]+$/)
+  assert.equal(api('nativeTransfer').memo, null)
+
+  // A memo is arbitrary bytes chosen by a stranger. It must survive JSON as
+  // data, never as anything the consumer has to interpret.
+  assert.equal(typeof JSON.parse(JSON.stringify(body)).memo.text, 'string')
 })

@@ -155,7 +155,19 @@ export default function ReceiptView({ receipt }: { receipt: Receipt }) {
         </div>
       </dl>
 
-      {receipt.note ? (
+      {receipt.memo ? (
+        <div style={{ padding: '0 24px 20px' }}>
+          <p className="note">
+            <span className="note-label">Memo · written on chain by the payer</span>
+            <span className={receipt.memo.text ? 'memo-text' : 'mono'}>
+              {receipt.memo.text ?? `${receipt.memo.hex.slice(0, 66)}${receipt.memo.hex.length > 66 ? '…' : ''}`}
+            </span>
+            <span className="note-meta">
+              Memo #{receipt.memo.index} on Arc{receipt.memo.text ? '' : ` · ${receipt.memo.byteLength} bytes, not text`}
+            </span>
+          </p>
+        </div>
+      ) : receipt.note ? (
         <div style={{ padding: '0 24px 20px' }}>
           <p className="note">
             <span className="note-label">

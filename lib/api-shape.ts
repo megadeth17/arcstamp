@@ -20,7 +20,9 @@ export type ApiReceipt = {
   /** Same amount in native base units (18 decimals), as a string to survive JSON. */
   amountBaseUnits: string
   totalMovedUsdc: string
-  transfers: { from: string; to: string; amountUsdc: string; amountBaseUnits: string }[]
+  transfers: { from: string; to: string; amountUsdc: string; amountBaseUnits: string; precision: 'exact' | 'truncated' }[]
+  /** The memo the payer attached through Arc's Memo predeploy, if any. */
+  memo: Receipt['memo']
   /** Fee paid, in USDC — on Arc the fee is denominated in dollars. */
   feeUsdc: string
   gasUsed: string
@@ -60,7 +62,9 @@ export function toApiReceipt(receipt: Receipt): ApiReceipt {
       to: transfer.to,
       amountUsdc: formatUnits(transfer.amount),
       amountBaseUnits: transfer.amount.toString(),
+      precision: transfer.precision,
     })),
+    memo: receipt.memo,
     feeUsdc: formatUnits(receipt.fee),
     gasUsed: receipt.gasUsed.toString(),
     note: receipt.note,

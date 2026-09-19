@@ -2,7 +2,16 @@
 // JSON-RPC objects and returns a receipt, which is why it can be tested offline
 // against captured mainnet fixtures.
 
-import { ARC_MAINNET, publicRpcOrigin, TRANSFER_TOPIC, USDC_EVENT_EMITTER } from './arc.ts'
+import {
+  ARC_MAINNET,
+  MEMO_CONTRACT,
+  MEMO_TOPIC,
+  NATIVE_PER_ERC20,
+  publicRpcOrigin,
+  TRANSFER_TOPIC,
+  USDC_ERC20,
+  USDC_EVENT_EMITTER,
+} from './arc.ts'
 
 export type RawLog = {
   address: string
@@ -37,12 +46,37 @@ export type RawBlock = {
   hash: string
 }
 
-/** A single USDC movement, decoded from a system-emitted Transfer log. */
+/** A single USDC movement, decoded from the Transfer logs a payment emits. */
 export type UsdcTransfer = {
   from: string
   to: string
   /** Amount in native base units (18 decimals). */
   amount: bigint
+  /**
+   * 'exact' when read from the 18-decimal system log. 'truncated' when only the
+   * 6-decimal ERC-20 log exists, in which case sub-micro-dollar dust is not
+   * recoverable and the amount is a lower bound.
+   */
+  precision: 'exact' | 'truncated'
+}
+
+/**
+ * A memo attached to a payment through Arc's Memo predeploy — an invoice
+ * number, an order id, or whatever the payer chose to record on chain.
+ */
+export type Memo = {
+  /** The payer, preserved as the original caller rather than the Memo contract. */
+  sender: string
+  /** What the memo was attached to — usually the USDC ERC-20 interface. */
+  target: string
+  /** Indexed lookup key chosen by the payer. */
+  memoId: string
+  /** The memo read as text, when the bytes are valid readable UTF-8. */
+  text: string | null
+  hex: string
+  byteLength: number
+  /** Position in the chain-wide memo sequence. */
+  index: string
 }
 
 /**
@@ -74,8 +108,10 @@ export type Receipt = {
   to: string | null
   /** Native USDC attached to the transaction itself, in base units. */
   value: bigint
-  /** Every USDC movement the transaction caused, per the system Transfer logs. */
+  /** Every USDC movement the transaction caused, per its Transfer logs. */
   transfers: UsdcTransfer[]
+  /** The memo carried with the payment, if it was sent through Arc's Memo predeploy. */
+  memo: Memo | null
   /** Sum of all transfers, in base units. */
   totalMoved: bigint
   /** Fee actually paid, in base units — denominated in dollars, because gas is USDC. */
@@ -138,27 +174,109 @@ function addressFromTopic(topic: string): string {
   return `0x${topic.slice(-40)}`.toLowerCase()
 }
 
+function transferLogsFrom(logs: RawLog[], emitter: string) {
+  const wanted = emitter.toLowerCase()
+  return logs.filter(
+    (log) =>
+      log.address?.toLowerCase() === wanted &&
+      log.topics?.[0]?.toLowerCase() === TRANSFER_TOPIC &&
+      log.topics.length >= 3,
+  )
+}
+
 /**
  * Decode USDC movements from a transaction's logs.
  *
- * On Arc, moving the native asset emits an ordinary ERC-20 Transfer log from a
- * system address, so one decoder covers both a plain wallet-to-wallet payment
- * and a payment routed through a contract.
+ * USDC on Arc is visible through two interfaces over one balance: the native
+ * asset, whose movements the chain emits from a system address at 18 decimals,
+ * and an ERC-20 contract at 6 decimals. Which logs appear depends on how the
+ * payment was sent:
+ *
+ *   - a plain native send emits only the system log
+ *   - an ERC-20 transfer between two addresses emits both, for one movement
+ *   - an ERC-20 self-transfer emits only the ERC-20 log
+ *
+ * Watching one emitter therefore either double-counts or silently misses real
+ * payments. This reads both and reconciles them: an ERC-20 log is dropped when
+ * a system log already describes the same movement, and the 18-decimal amount
+ * is preferred because the 6-decimal view truncates sub-micro-dollar dust.
  */
 export function decodeUsdcTransfers(logs: RawLog[]): UsdcTransfer[] {
-  const emitter = USDC_EVENT_EMITTER.toLowerCase()
-  const out: UsdcTransfer[] = []
-  for (const log of logs) {
-    if (log.address?.toLowerCase() !== emitter) continue
-    if (log.topics?.[0]?.toLowerCase() !== TRANSFER_TOPIC) continue
-    if (log.topics.length < 3) continue
-    out.push({
-      from: addressFromTopic(log.topics[1]),
-      to: addressFromTopic(log.topics[2]),
-      amount: hexToBigInt(log.data),
-    })
+  const native = transferLogsFrom(logs, USDC_EVENT_EMITTER).map((log) => ({
+    from: addressFromTopic(log.topics[1]),
+    to: addressFromTopic(log.topics[2]),
+    amount: hexToBigInt(log.data),
+    precision: 'exact' as const,
+  }))
+
+  const claimed = new Array(native.length).fill(false)
+  const extra: UsdcTransfer[] = []
+
+  for (const log of transferLogsFrom(logs, USDC_ERC20)) {
+    const from = addressFromTopic(log.topics[1])
+    const to = addressFromTopic(log.topics[2])
+    const amount6 = hexToBigInt(log.data)
+
+    // The ERC-20 number is the native amount truncated by 10^12, so a match is
+    // floor division rather than equality — a payment carrying dust still
+    // reconciles.
+    const match = native.findIndex(
+      (candidate, index) =>
+        !claimed[index] &&
+        candidate.from === from &&
+        candidate.to === to &&
+        candidate.amount / NATIVE_PER_ERC20 === amount6,
+    )
+
+    if (match >= 0) {
+      claimed[match] = true
+      continue
+    }
+
+    extra.push({ from, to, amount: amount6 * NATIVE_PER_ERC20, precision: 'truncated' })
   }
-  return out
+
+  return [...native, ...extra]
+}
+
+/**
+ * Decode the memo a payment carried, if any.
+ *
+ * The Memo event is `Memo(address indexed sender, address indexed target,
+ * bytes32 callDataHash, bytes32 indexed memoId, bytes memo, uint256 memoIndex)`,
+ * so the unindexed data is the call-data hash, an offset to the memo bytes, and
+ * the memo index, with the bytes themselves at that offset.
+ */
+export function decodeMemo(logs: RawLog[]): Memo | null {
+  const log = logs.find(
+    (entry) =>
+      entry.address?.toLowerCase() === MEMO_CONTRACT &&
+      entry.topics?.[0]?.toLowerCase() === MEMO_TOPIC &&
+      entry.topics.length >= 4,
+  )
+  if (!log) return null
+
+  const data = log.data.startsWith('0x') ? log.data.slice(2) : log.data
+  const wordAt = (index: number) => data.slice(index * 64, index * 64 + 64)
+  if (data.length < 192) return null
+
+  const offset = Number(BigInt(`0x${wordAt(1)}`)) * 2
+  const lengthHex = data.slice(offset, offset + 64)
+  if (lengthHex.length < 64) return null
+
+  const byteLength = Number(BigInt(`0x${lengthHex}`))
+  const bodyHex = data.slice(offset + 64, offset + 64 + byteLength * 2)
+  const note = decodeNote(`0x${bodyHex}`)
+
+  return {
+    sender: addressFromTopic(log.topics[1]),
+    target: addressFromTopic(log.topics[2]),
+    memoId: log.topics[3],
+    text: note?.text ?? null,
+    hex: `0x${bodyHex}`,
+    byteLength,
+    index: BigInt(`0x${wordAt(2)}`).toString(),
+  }
 }
 
 /**
@@ -195,9 +313,12 @@ export function decodeNote(input: string): Receipt['note'] {
   return { hex: input, text, byteLength: bytes.length }
 }
 
-function classify(value: bigint, transfers: UsdcTransfer[], input: string): Receipt['kind'] {
+function classify(value: bigint, transfers: UsdcTransfer[], input: string, memo: Memo | null): Receipt['kind'] {
   const hasCalldata = Boolean(input) && input !== '0x'
   if (transfers.length === 0 && value === 0n) return 'no-value'
+  // A memo'd payment is calldata by construction — it goes through the Memo
+  // predeploy — but it is still one person paying another, not a contract call.
+  if (memo && transfers.length > 0) return 'payment'
   if (!hasCalldata && transfers.length > 0) return 'payment'
   if (transfers.length > 0) return 'contract-call'
   return 'unknown'
@@ -224,6 +345,7 @@ export function buildReceipt(input: ReceiptInput): Receipt {
       to: null,
       value: 0n,
       transfers: [],
+      memo: null,
       totalMoved: 0n,
       fee: 0n,
       gasUsed: 0n,
@@ -244,14 +366,18 @@ export function buildReceipt(input: ReceiptInput): Receipt {
   }
 
   const value = hexToBigInt(tx.value)
-  const transfers = txReceipt ? decodeUsdcTransfers(txReceipt.logs ?? []) : []
+  const logs = txReceipt?.logs ?? []
+  const transfers = txReceipt ? decodeUsdcTransfers(logs) : []
+  const memo = txReceipt ? decodeMemo(logs) : null
   const totalMoved = transfers.reduce((sum, transfer) => sum + transfer.amount, 0n)
   const gasUsed = hexToBigInt(txReceipt?.gasUsed)
   const fee = gasUsed * hexToBigInt(txReceipt?.effectiveGasPrice)
   const succeeded = txReceipt?.status === '0x1'
   const blockNumber = hexToNumber(tx.blockNumber)
   const timestamp = hexToNumber(block?.timestamp ?? tx.blockTimestamp ?? null)
-  const note = decodeNote(tx.input)
+  // When a memo is present the calldata is just the Memo call wrapping it, so
+  // showing both would be the same fact twice, once unreadably.
+  const note = memo ? null : decodeNote(tx.input)
 
   let finality: Finality | null = null
   if (blockNumber !== null && input.finalizedBlockNumber !== null && input.headBlockNumber !== null) {
@@ -293,7 +419,11 @@ export function buildReceipt(input: ReceiptInput): Receipt {
       id: 'usdc-transfer-logged',
       label: 'USDC movement recorded by the chain',
       passed: true,
-      detail: `${transfers.length} Transfer log${transfers.length === 1 ? '' : 's'} emitted by Arc's system address ${USDC_EVENT_EMITTER}, totalling ${formatUnits(totalMoved)} USDC.`,
+      detail: `${transfers.length} movement${transfers.length === 1 ? '' : 's'} totalling ${formatUnits(totalMoved)} USDC, decoded from the Transfer logs this transaction emitted${
+        transfers.every((transfer) => transfer.precision === 'exact')
+          ? ` through Arc's system address ${USDC_EVENT_EMITTER}, at full 18-decimal precision.`
+          : `. Part of this was only recorded through the 6-decimal ERC-20 view, so that amount is exact to the cent but may omit sub-micro-dollar dust.`
+      }`,
     })
 
     // Cross-check: the system log and the transaction's own value field must
@@ -319,6 +449,21 @@ export function buildReceipt(input: ReceiptInput): Receipt {
     })
   }
 
+  if (memo) {
+    // The memo's sender is the original caller, recovered through the CallFrom
+    // precompile. If it disagreed with the transaction's sender, the memo would
+    // be attributable to someone other than the payer.
+    const attributed = memo.sender === (tx.from?.toLowerCase() ?? '')
+    checks.push({
+      id: 'memo-attributed',
+      label: 'Memo was written by the payer',
+      passed: attributed,
+      detail: attributed
+        ? `Memo #${memo.index} was recorded through Arc's Memo predeploy by ${memo.sender}, the same address that signed this transaction.`
+        : `Memo #${memo.index} names ${memo.sender} as its author, which is not the address that signed this transaction.`,
+    })
+  }
+
   if (finality) {
     checks.push({
       id: 'finalized',
@@ -338,6 +483,7 @@ export function buildReceipt(input: ReceiptInput): Receipt {
     to: tx.to?.toLowerCase() ?? null,
     value,
     transfers,
+    memo,
     totalMoved,
     fee,
     gasUsed,
@@ -346,7 +492,7 @@ export function buildReceipt(input: ReceiptInput): Receipt {
     timestamp,
     finality,
     checks,
-    kind: classify(value, transfers, tx.input),
+    kind: classify(value, transfers, tx.input, memo),
   }
 }
 

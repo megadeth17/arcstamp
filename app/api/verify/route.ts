@@ -25,7 +25,9 @@ export function GET() {
         settled: 'true when the containing block is at or behind Arc’s finalized head. Arc finality is deterministic.',
         amountUsdc: 'Exact decimal string. Native accounting on Arc uses 18 decimals, finer than USDC’s canonical 6.',
         feeUsdc: 'What the payment cost to send. Gas on Arc is paid in USDC, so this is a dollar figure.',
-        transfers: 'Every USDC movement in the transaction, decoded from the Transfer logs Arc emits for native transfers.',
+        transfers:
+          'Every USDC movement, reconciled across Arc’s 18-decimal system log and its 6-decimal ERC-20 log so one payment is counted once. precision is "exact" when read from the system log, "truncated" when only the 6-decimal view recorded it.',
+        memo: 'The memo attached through Arc’s Memo predeploy, with the payer that wrote it. null when the payment carried none.',
         checks: 'The predicates evaluated, each with the evidence behind it.',
       },
       source: 'https://github.com/megadeth17/arcstamp',
