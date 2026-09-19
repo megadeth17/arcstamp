@@ -81,9 +81,20 @@ Re-capture the fixtures from live mainnet at any time — the script is the proo
 npm run fixtures
 ```
 
+## Writing a memo
+
+The app only reads, but `scripts/send-memo.mjs` sends one memo'd USDC payment so you can watch the whole loop close — the receipt it prints is a page on this site. It pays your own address, so the USDC returns and only gas is spent, and it refuses to sign if the worst-case fee exceeds a hard cap.
+
+```bash
+ARC_PRIVATE_KEY=0x… node scripts/send-memo.mjs          # dry run, signs nothing
+ARC_PRIVATE_KEY=0x… node scripts/send-memo.mjs --send
+```
+
+It prices gas at 30 Gwei deliberately: Arc drops anything under 20 Gwei **silently**, with no receipt to poll.
+
 ## Design notes
 
-**No web3 library.** The whole product is four JSON-RPC reads. A dependency-free client sent as one batched request is smaller, faster, and cannot be broken by an upstream SDK regression. `lib/rpc.ts` is 70 lines.
+**No web3 library in the app.** The whole product is four JSON-RPC reads. A dependency-free client sent as one batched request is smaller, faster, and cannot be broken by an upstream SDK regression. `lib/rpc.ts` is 70 lines. `viem` is a dev dependency used only by the write script above.
 
 **Money is never a float.** All arithmetic is `BigInt` over base units; decimal strings are produced by string manipulation. The API returns amounts as strings in both views (`amountUsdc` and `amountBaseUnits`) so no consumer has to parse a float.
 
