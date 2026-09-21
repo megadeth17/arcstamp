@@ -21,6 +21,7 @@ export const metadata: Metadata = {
     description: 'A shareable, verifiable receipt for any payment on Arc mainnet.',
   },
   robots: { index: true, follow: true },
+  icons: { icon: [{ url: '/icon.svg', type: 'image/svg+xml' }, { url: '/logo-512.png', sizes: '512x512' }] },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
