@@ -61,17 +61,22 @@ https://arcstamp.vercel.app
 
 **6. Arc mainnet contract address or a transaction hash we can verify** *(684 characters)*
 
+Leads with the hash, because a screener scans before it reads.
+
 ```
-Arcstamp is a reader, so its footprint on mainnet is the transactions it resolves rather than one it sent. Any of these open on the live site and on explorer.arc.io:
-
 0x3b84ca8db4672dbd24ad40aa2418236dbea61bb98634c633b196feea8328e47e
-  an agent's memo'd USDC payment, memo "cronus|signal|BTC-USDC momentum|1789733187299"
-0x808d379bf646917db27df3e13e60b8a85ea13022364000caad0ae30567fc3254
-  a payment tagged "FV-2026-001" that emits NO system Transfer log, only the 6-decimal one
-0x7da85a09e8b636ce5d3d7de8b99833d3eacfd6d81dcb4f18b6d68ac1190f4453
-  a plain native transfer, 21000 gas, fee 0.0004515 USDC
 
-Open each at https://arcstamp.vercel.app/r/<hash> and compare against the chain.
+A memo'd USDC payment on Arc mainnet, memo "cronus|signal|BTC-USDC momentum|1789733187299". Open it as a receipt at https://arcstamp.vercel.app/r/0x3b84ca8db4672dbd24ad40aa2418236dbea61bb98634c633b196feea8328e47e and compare it against explorer.arc.io.
+
+Two more the live deployment resolves:
+
+0x808d379bf646917db27df3e13e60b8a85ea13022364000caad0ae30567fc3254
+tagged "FV-2026-001", and it emits no system Transfer log at all, only the 6-decimal one
+
+0x7da85a09e8b636ce5d3d7de8b99833d3eacfd6d81dcb4f18b6d68ac1190f4453
+a plain native transfer, 21000 gas, fee 0.0004515 USDC
+
+Arcstamp deploys no contract of its own. It is a reader, and these are mainnet transactions it verifies live at https://arcstamp.vercel.app/r/<hash>
 ```
 
 **7. Public repo** *(38 characters)*
