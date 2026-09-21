@@ -128,17 +128,19 @@ RESEARCH.md: the method behind every factual claim in the repo, as re-runnable R
 
 ## BUIDL profile fields (the DoraHacks object, separate from the questions above)
 
+Read off the live form on 2026-09-20. The Profile step asks for these, and the starred ones block submission.
+
 | Field | Value |
 |---|---|
-| BUIDL name | Arcstamp |
-| Vision | A receipt for every USDC payment on Arc — public, shareable, and verifiable by anyone. |
-| GitHub repo | https://github.com/megadeth17/arcstamp — **required, submission is blocked without it** |
-| Demo URL | https://arcstamp.vercel.app |
-| Social links | https://x.com/mega2608 — **at least one is required** |
-| Category | Payments / Infrastructure |
+| BUIDL (project) name * | Arcstamp |
+| BUIDL logo * | `public/logo-512.png` — 512×512 PNG, 26 KB, also served at https://arcstamp.vercel.app/logo-512.png |
+| Vision * | Crypto payments arrive with no receipt. A transaction hash is not something you can send to a client or an accountant — it is a string on a block explorer. Arcstamp turns any payment on Arc into a receipt anyone can open and verify, including the memo the payer wrote on chain. |
+| Category * | **Crypto / Web3** — the options are a fixed set: Crypto / Web3, Quantum Computing, Space, AI / Robotics, Other |
+| GitHub/Gitlab/Bitbucket * | https://github.com/megadeth17/arcstamp — **hard block, the form refuses without it** |
+| Project website (optional) | https://arcstamp.vercel.app |
+| Demo video (optional) | leave empty — none produced, and this hackathon does not require one |
+| Social links (at least 1) * | https://x.com/mega2608 |
 | Project Source | Hackathon |
-| Logo | 480×480, under 2 MB |
-| Demo video | Not required by this hackathon (`mandatoryVideoLink` is false) |
 
 ## Submission mechanics, verified
 
